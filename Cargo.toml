@@ -1,0 +1,19 @@
+[package]
+name = "rcp_palette"
+version = "0.1.0"
+edition = "2021"
+authors = ["Daryna"]
+description = "Простий і надійний парсер для перетворення рядкових представлень CSS-кольорів (Hex та RGB) у внутрішню структуру даних Rust."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/dahl1a-bloom/rcp-pallete"
+keywords = ["parser", "css", "color", "cli"]
+
+[lib]
+name = "rcp_palette"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0.100"
+clap = { version = "4.5.52", features = ["derive"] }
+thiserror = "1.0"
