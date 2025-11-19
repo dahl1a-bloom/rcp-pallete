@@ -76,3 +76,39 @@ fn rgb_non_numeric_component_is_error() -> Result<()> {
     assert!(msg.contains("числовий") || msg.contains("numeric"));
     Ok(())
 }
+
+#[test]
+fn named_color_red_is_ok() -> Result<()> {
+    let c = parse_color("red")?;
+    assert_eq!((c.r, c.g, c.b), (255, 0, 0));
+    Ok(())
+}
+
+#[test]
+fn named_color_rebeccapurple_is_ok() -> Result<()> {
+    let c = parse_color("rebeccapurple")?;
+    assert_eq!((c.r, c.g, c.b), (102, 51, 153));
+    Ok(())
+}
+
+#[test]
+fn hsl_parsing_is_ok() -> Result<()> {
+    let c = parse_color("hsl(0, 100%, 50%)")?;
+    assert_eq!((c.r, c.g, c.b), (255, 0, 0));
+    Ok(())
+}
+
+#[test]
+fn hsl_with_spaces_parsing_is_ok() -> Result<()> {
+    let c = parse_color(" hsl(120, 100%, 50%) ")?;
+    assert_eq!((c.r, c.g, c.b), (0, 255, 0));
+    Ok(())
+}
+
+#[test]
+fn hsl_invalid_format_is_error() -> Result<()> {
+    let err = parse_color("hsl(120, 100%)").unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("формат") || msg.contains("format") || msg.contains("підтримуваний"));
+    Ok(())
+}

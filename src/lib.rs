@@ -39,11 +39,13 @@ pub enum ColorParseError {
 /// Формальна граматика:
 ///
 /// ```text
-/// Color        := Hex | Rgb
+/// Color        := Named | Hex | Rgb | Hsl
+/// Named        := one of ["black", "white", "red", "green", "blue", "yellow", "cyan", "magenta", "gray", "grey", "rebeccapurple"]
 /// Hex          := "#" (Hex6 | Hex3)
 /// Hex6         := H H H H H H                 ; шість шістнадцяткових символів
 /// Hex3         := H H H                       ; три шістнадцяткових символи (дублюються)
 /// Rgb          := "rgb" "(" Int "," Int "," Int ")"
+/// Hsl          := "hsl" "(" Int "," Int "%" "," Int "%" ")"
 /// H            := [0-9A-Fa-f]
 /// Int          := Digit+                      ; десяткові цілі
 /// Digit        := [0-9]
@@ -72,8 +74,16 @@ pub enum ColorParseError {
 ///    - Якщо число поза діапазоні 0..=255 → `RgbComponentOutOfRange`.
 ///    - Некоректна кількість компонентів або відсутні дужки → `RgbInvalidFormat`.
 ///
-/// 6. **MissingHashPrefix**:
-///    - Викидається, коли рядок не починається з `#` і не відповідає формі `rgb(...)`.
+/// 6. **NamedColor**:
+///    - Іменовані CSS-кольори (наприклад, `red`, `blue`, `rebeccapurple`) мапляться на відповідні RGB-комбінації.
+///
+/// 7. **HSL: `hsl(H, S%, L%)`**:
+///    - H у градусах (будь-яке дійсне число, нормалізується по модулю 360).
+///    - S та L у відсотках 0..=100, що нормалізуються у 0.0..=1.0.
+///    - Використовується стандартне перетворення HSL → RGB з поверненням `Color { r, g, b }`.
+///
+/// 8. **MissingHashPrefix**:
+///    - Викидається, коли рядок не є іменованим кольором, не починається з `#` і не відповідає формі `rgb(...)` чи `hsl(...)`.
 /// ## Приклади
 ///
 /// ```
@@ -96,11 +106,21 @@ pub enum ColorParseError {
 /// assert!(parse_color("rgb(256, 0, 0)").is_err());
 /// // Правило 5: rgb() — нечисловий компонент
 /// assert!(parse_color("rgb(aa, 0, 0)").is_err());
-/// // Негативний приклад (Правило 6: MissingHashPrefix)
+/// // Правило 6: NamedColor (іменований колір)
+/// assert_eq!(parse_color("red").unwrap(), Color { r: 255, g: 0, b: 0 });
+/// // Правило 7: hsl() — червоний колір
+/// assert_eq!(parse_color("hsl(0, 100%, 50%)").unwrap(), Color { r: 255, g: 0, b: 0 });
+/// // Негативний приклад (Правило 8: MissingHashPrefix)
 /// assert!(parse_color("1A2B3C").is_err());
 /// ```
 pub fn parse_color(input: &str) -> Result<Color, ColorParseError> {
-    if let Some(hex_str) = input.strip_prefix('#') {
+    let trimmed = input.trim();
+
+    if let Some(named) = parse_named_color(trimmed) {
+        return Ok(named);
+    }
+
+    if let Some(hex_str) = trimmed.strip_prefix('#') {
         match hex_str.len() {
             3 => {
                 let mut chars = hex_str.chars();
@@ -124,10 +144,52 @@ pub fn parse_color(input: &str) -> Result<Color, ColorParseError> {
             }
             _ => Err(ColorParseError::InvalidLength(hex_str.len())),
         }
-    } else if input.trim_start().to_ascii_lowercase().starts_with("rgb(") {
-        parse_rgb(input)
+    } else if trimmed.to_ascii_lowercase().starts_with("rgb(") {
+        parse_rgb(trimmed)
+    } else if trimmed.to_ascii_lowercase().starts_with("hsl(") {
+        parse_hsl(trimmed)
     } else {
         Err(ColorParseError::MissingHashPrefix)
+    }
+}
+
+fn parse_named_color(name: &str) -> Option<Color> {
+    match name.to_ascii_lowercase().as_str() {
+        "black" => Some(Color { r: 0, g: 0, b: 0 }),
+        "white" => Some(Color {
+            r: 255,
+            g: 255,
+            b: 255,
+        }),
+        "red" => Some(Color { r: 255, g: 0, b: 0 }),
+        "green" => Some(Color { r: 0, g: 128, b: 0 }),
+        "blue" => Some(Color { r: 0, g: 0, b: 255 }),
+        "yellow" => Some(Color {
+            r: 255,
+            g: 255,
+            b: 0,
+        }),
+        "cyan" => Some(Color {
+            r: 0,
+            g: 255,
+            b: 255,
+        }),
+        "magenta" => Some(Color {
+            r: 255,
+            g: 0,
+            b: 255,
+        }),
+        "gray" | "grey" => Some(Color {
+            r: 128,
+            g: 128,
+            b: 128,
+        }),
+        "rebeccapurple" => Some(Color {
+            r: 102,
+            g: 51,
+            b: 153,
+        }),
+        _ => None,
     }
 }
 
@@ -168,4 +230,76 @@ fn parse_rgb(input: &str) -> Result<Color, ColorParseError> {
             })
         }
     }
+}
+
+fn parse_hsl(input: &str) -> Result<Color, ColorParseError> {
+    let open = input.find('(').ok_or(ColorParseError::UnsupportedFormat)?;
+    let close = input.rfind(')').ok_or(ColorParseError::UnsupportedFormat)?;
+
+    if close <= open + 1 {
+        return Err(ColorParseError::UnsupportedFormat);
+    }
+
+    let inner = &input[open + 1..close];
+    let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+    if parts.len() != 3 {
+        return Err(ColorParseError::UnsupportedFormat);
+    }
+
+    let h_deg: f32 = parts[0]
+        .parse()
+        .map_err(|_| ColorParseError::UnsupportedFormat)?;
+
+    let s_pct_str = parts[1]
+        .strip_suffix('%')
+        .ok_or(ColorParseError::UnsupportedFormat)?;
+    let l_pct_str = parts[2]
+        .strip_suffix('%')
+        .ok_or(ColorParseError::UnsupportedFormat)?;
+
+    let s_pct: f32 = s_pct_str
+        .parse()
+        .map_err(|_| ColorParseError::UnsupportedFormat)?;
+    let l_pct: f32 = l_pct_str
+        .parse()
+        .map_err(|_| ColorParseError::UnsupportedFormat)?;
+
+    let h = (h_deg.rem_euclid(360.0)) / 360.0;
+    let s = (s_pct / 100.0).clamp(0.0, 1.0);
+    let l = (l_pct / 100.0).clamp(0.0, 1.0);
+
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
+    let p = 2.0 * l - q;
+
+    fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
+        if t < 0.0 {
+            t += 1.0;
+        }
+        if t > 1.0 {
+            t -= 1.0;
+        }
+        if t < 1.0 / 6.0 {
+            p + (q - p) * 6.0 * t
+        } else if t < 1.0 / 2.0 {
+            q
+        } else if t < 2.0 / 3.0 {
+            p + (q - p) * (2.0 / 3.0 - t) * 6.0
+        } else {
+            p
+        }
+    }
+
+    let r_f = hue_to_rgb(p, q, h + 1.0 / 3.0);
+    let g_f = hue_to_rgb(p, q, h);
+    let b_f = hue_to_rgb(p, q, h - 1.0 / 3.0);
+
+    let r = (r_f * 255.0).round().clamp(0.0, 255.0) as u8;
+    let g = (g_f * 255.0).round().clamp(0.0, 255.0) as u8;
+    let b = (b_f * 255.0).round().clamp(0.0, 255.0) as u8;
+
+    Ok(Color { r, g, b })
 }
