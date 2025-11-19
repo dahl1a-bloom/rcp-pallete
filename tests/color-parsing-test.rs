@@ -68,3 +68,11 @@ fn rgb_out_of_range_is_error() -> Result<()> {
     assert!(msg.contains("0..=255") || msg.contains("range"));
     Ok(())
 }
+
+#[test]
+fn rgb_non_numeric_component_is_error() -> Result<()> {
+    let err = parse_color("rgb(aa, 0, 0)").unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("числовий") || msg.contains("numeric"));
+    Ok(())
+}

@@ -7,6 +7,7 @@ description = "Простий і надійний парсер для перет
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/dahl1a-bloom/rcp-pallete"
+documentation = "https://docs.rs/rcp-palette"
 keywords = ["parser", "css", "color", "cli"]
 
 [lib]

@@ -1,16 +1,15 @@
-use std::fs;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use rcp_palette::{parse_color, ColorParseError}; 
+use rcp_palette::{parse_color, ColorParseError};
+use std::fs;
 
 #[derive(Parser, Debug)]
 #[clap(
-    author, 
-    version, 
+    author,
+    version,
     about = "CLI для парсингу CSS-кольорів: Hex (#RRGGBB, #RGB) та rgb(R, G, B).", 
     long_about = None
 )]
-
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
@@ -29,37 +28,48 @@ fn main() -> Result<()> {
     match &cli.command {
         Commands::Parse { color_str } => {
             println!("--- Парсинг кольору: {} ---", color_str);
-            
+
             let color = parse_color(color_str)
-                .map_err(|e| anyhow::anyhow!(e)) 
+                .map_err(|e| anyhow::anyhow!(e))
                 .context("Не вдалося виконати парсинг кольору!")?;
-            
+
             println!("Парсинг кольору пройшов успішно!");
             println!("   > Hex: {}", color_str);
             println!("   > RGB: r: {}, g: {}, b: {}", color.r, color.g, color.b);
         }
         Commands::File { path } => {
             println!("--- Читання та парсинг кольорів з файлу: {} ---", path);
-            
+
             let content = fs::read_to_string(path)
                 .with_context(|| format!("Не вдалося прочитати файл за шляхом: {}", path))?;
             for (i, line) in content.lines().enumerate() {
                 let trimmed_line = line.trim();
-                if trimmed_line.is_empty() { continue; }
-                
+                if trimmed_line.is_empty() {
+                    continue;
+                }
+
                 match parse_color(trimmed_line) {
-                    Ok(color) => println!("Рядок {}: ✅ {} -> RGB: r:{}, g:{}, b:{}", 
-                                          i + 1, trimmed_line, color.r, color.g, color.b),
-                    Err(e) => {
-                        match e {
-                            ColorParseError::MissingHashPrefix => 
-                                eprintln!("Рядок {}: ❌ {} -> Помилка: Колір має починатися з '#'", i + 1, trimmed_line),
-                            ColorParseError::InvalidLength(_) =>
-                                eprintln!("Рядок {}: ❌ {} -> Помилка: Недійсна довжина Hex-коду", i + 1, trimmed_line),
-                            _ => 
-                                eprintln!("Рядок {}: ❌ {} -> Помилка: {}", i + 1, trimmed_line, e),
-                        }
-                    }
+                    Ok(color) => println!(
+                        "Рядок {}: ✅ {} -> RGB: r:{}, g:{}, b:{}",
+                        i + 1,
+                        trimmed_line,
+                        color.r,
+                        color.g,
+                        color.b
+                    ),
+                    Err(e) => match e {
+                        ColorParseError::MissingHashPrefix => eprintln!(
+                            "Рядок {}: ❌ {} -> Помилка: Колір має починатися з '#'",
+                            i + 1,
+                            trimmed_line
+                        ),
+                        ColorParseError::InvalidLength(_) => eprintln!(
+                            "Рядок {}: ❌ {} -> Помилка: Недійсна довжина Hex-коду",
+                            i + 1,
+                            trimmed_line
+                        ),
+                        _ => eprintln!("Рядок {}: ❌ {} -> Помилка: {}", i + 1, trimmed_line, e),
+                    },
                 }
             }
             println!("--- Парсинг файлу завершено ---");
