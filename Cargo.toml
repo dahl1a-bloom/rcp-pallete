@@ -1,6 +1,6 @@
 [package]
 name = "rcp_palette"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Daryna"]
 description = "Простий і надійний парсер для перетворення рядкових представлень CSS-кольорів (Hex та RGB) у внутрішню структуру даних Rust."
