@@ -7,7 +7,7 @@ use std::fs;
 #[clap(
     author,
     version,
-    about = "CLI для парсингу CSS-кольорів: Hex (#RRGGBB, #RGB) та rgb(R, G, B).", 
+    about = "CLI для парсингу CSS-кольорів: Hex (#RRGGBB, #RGB), rgb(R, G, B), hsl(H, S%, L%), іменованих.", 
     long_about = None
 )]
 struct Cli {
@@ -34,8 +34,8 @@ fn main() -> Result<()> {
                 .context("Не вдалося виконати парсинг кольору!")?;
 
             println!("Парсинг кольору пройшов успішно!");
-            println!("   > Hex: {}", color_str);
-            println!("   > RGB: r: {}, g: {}, b: {}", color.r, color.g, color.b);
+            println!("   > Введений колір: {}", color_str);
+            println!("   > Color: r: {}, g: {}, b: {}", color.r, color.g, color.b);
         }
         Commands::File { path } => {
             println!("--- Читання та парсинг кольорів з файлу: {} ---", path);
